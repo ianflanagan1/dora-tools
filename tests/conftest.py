@@ -166,18 +166,18 @@ def jira_fake() -> FakeJira:
     return FakeJira()
 
 
-WORKSPACE = (
-    '[tracker]\nsite = "me.atlassian.net"\nspace = "KAN"\n\n[dora]\nproduction = "production"\n'
-)
+TRACKER = 'version = 1\nsite = "me.atlassian.net"\nspace = "KAN"\n'
+DORA = 'version = 1\nproduction = "production"\n'
 
 
 @pytest.fixture
 def ctx(bitbucket_fake: FakeBitbucket, jira_fake: FakeJira) -> Context:
-    """A project on the fake Bitbucket, committing the team's document and a .workspace.toml."""
+    """A project on the fake Bitbucket, committing the team's document and its settings."""
     bitbucket_fake.files[("main", "docs/dora-metrics.md")] = "# DORA metrics\n"
-    bitbucket_fake.files[("main", ".workspace.toml")] = WORKSPACE
+    bitbucket_fake.files[("main", ".config/ianf-tracker.toml")] = TRACKER
+    bitbucket_fake.files[("main", ".config/ianf-dora.toml")] = DORA
     project = Project(
-        Ref("bitbucket.org", "team/app"), "main", Settings(production="production"), (), WORKSPACE
+        Ref("bitbucket.org", "team/app"), "main", Settings(production="production"), (), TRACKER
     )
     host = Bitbucket(bitbucket_fake)
     return Context(project, SINCE, host, bitbucket_client=bitbucket_fake, jira_client=jira_fake)

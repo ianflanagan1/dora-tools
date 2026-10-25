@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ianflanagan1/dora-tools/main/schema/ianf-dora.v1.json",
+  "title": ".config/ianf-dora.toml, version 1",
+  "description": "What a repository counts as production, for dora-tools, which reads the copy committed on the code host's default branch. See R1 in dora-tools' docs/requirements.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "production"],
+  "properties": {
+    "version": {
+      "description": "The version of this file's format.",
+      "const": 1
+    },
+    "production": {
+      "description": "The deployment environment whose deployments count as production, as the code host names it, matched ignoring case.",
+      "type": "string",
+      "minLength": 1
+    },
+    "failure_label": {
+      "description": "The label that marks an issue as a production failure.",
+      "type": "string",
+      "minLength": 1,
+      "default": "production-failure"
+    },
+    "production_branch": {
+      "description": "The branch production is deployed from. The repository's main branch if left out.",
+      "type": "string",
+      "minLength": 1
+    },
+    "integration_branches": {
+      "description": "Branches that gather changes on their way to production, such as develop.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "doc": {
+      "description": "The team's document, from the repository's root (R2).",
+      "type": "string",
+      "minLength": 1,
+      "default": "docs/dora-metrics.md"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Your settings for dora-tools on this machine. Copy this file to config.toml, which git ignores,
 # and edit it. A setting left out takes the default shown here. What a repository counts as
-# production is its team's, in the [dora] table of its own .workspace.toml, not here.
+# production is its team's, in its own committed .config/ianf-dora.toml, not here.
 
 # The repositories `dora sync` syncs when given none, as host/workspace/name.
 repos = ["bitbucket.org/your-workspace/your-repo"]

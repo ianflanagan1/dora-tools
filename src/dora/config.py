@@ -1,6 +1,6 @@
 """The collecting machine's own settings, from config.toml in dora-tools' folder, which git
 ignores: which repositories it syncs, and where it keeps what it reads. They're personal, unlike
-a repository's [dora] settings, which its team commits. config.example.toml shows them.
+a repository's .config/ianf-dora.toml, which its team commits. config.example.toml shows them.
 """
 
 import sys

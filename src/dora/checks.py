@@ -17,10 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 from functools import cached_property
-from pathlib import Path
 
-import jira_tools
-import repo_tools
 from cli_kit.outcome import Precondition, Problem
 from jira_tools import config as jira_config
 from jira_tools import session as jira_session
@@ -29,12 +26,15 @@ from repo_tools.bitbucket import api as bitbucket
 from repo_tools.forge import Forge
 
 from dora import tracker
-from dora.project import Project, Settings
+from dora.project import FILE, TRACKER, Project, Settings
 
 KEY = re.compile(r"\b[A-Z][A-Z0-9]+-\d+\b")
 REUSE_AFTER = timedelta(days=14)
 """How long after a failure's first fix merged a later one with its key looks like reuse."""
 TOKENS = "https://id.atlassian.com/manage-profile/security/api-tokens"
+GITHUB = "https://github.com/ianflanagan1"
+TOOL_REPOSITORIES = {"bitbucket": "repo-tools", "jira": "jira-tools"}
+"""The repository each command dora needs on the PATH comes from."""
 
 
 class Status(StrEnum):
@@ -90,7 +90,7 @@ class Context:
     @property
     def settings(self) -> Settings:
         if self.project.settings is None:
-            raise Precondition("Needs R1: .workspace.toml's [dora] table.")
+            raise Precondition("Needs R1: .config/ianf-dora.toml.")
         return self.project.settings
 
     @cached_property
@@ -99,13 +99,13 @@ class Context:
 
     @property
     def production_branch(self) -> str:
-        """The branch production is deployed from: [dora] production_branch, or the repo's main
-        branch."""
+        """The branch production is deployed from: production_branch in ianf-dora.toml, or the
+        repo's main branch."""
         return self.project.production_branch
 
     @cached_property
     def tracker(self) -> jira_config.Config:
-        """The [tracker] settings in the committed .workspace.toml."""
+        """The settings in the committed .config/ianf-tracker.toml."""
         return tracker.settings(self.project)
 
     @cached_property
@@ -179,7 +179,7 @@ def production_environment(ctx: Context) -> Result:
     if names:
         choices = ", ".join(names)
         fix.append(
-            f"Or, if production is one of those, set [dora] production to one of: {choices}."
+            f"Or, if production is one of those, set production in {FILE} to one of: {choices}."
         )
     return missed(f"No environment {wanted}.", f"It has: {', '.join(names) or 'none'}.", fix=fix)
 
@@ -190,7 +190,8 @@ def deployment_step(ctx: Context) -> Result:
     fix = [
         f"Commit to {branch}'s bitbucket-pipelines.yml a step with `deployment: {wanted}` that"
         " deploys production.",
-        "Or, if production is deployed from another branch, set [dora] production_branch to it.",
+        f"Or, if production is deployed from another branch, set production_branch in {FILE}"
+        " to it.",
     ]
     if text is None:
         return missed(f"No bitbucket-pipelines.yml on {branch}, or no branch {branch}.", fix=fix)
@@ -210,9 +211,8 @@ def dora_table(ctx: Context) -> Result:
         return missed(
             *ctx.project.problem,
             fix=[
-                f"Commit to {ctx.project.main_branch} a .workspace.toml at the repository's root"
-                " with a [dora] table, with at least:",
-                '[dora] production = "<your production deployment environment>"',
+                f"Commit to {ctx.project.main_branch} a {FILE} with at least:",
+                'version = 1, production = "<your production deployment environment>"',
                 "dora-tools' docs/requirements.md, under R1, lists every setting.",
             ],
         )
@@ -233,7 +233,7 @@ def team_document(ctx: Context) -> Result:
         fix=[
             f"Commit {doc} to {branch} for the team: how the metrics apply to your process and"
             " what each person does (dora-tools' docs/requirements.md, R2).",
-            "Or, if it's elsewhere, set [dora] doc to its path.",
+            f"Or, if it's elsewhere, set doc in {FILE} to its path.",
         ],
     )
 
@@ -245,7 +245,7 @@ def jira_space(ctx: Context) -> Result:
         return missed(
             f"No space {space} the Jira token can see.",
             fix=[
-                "Set [tracker] space in .workspace.toml to the key of your space, as in KAN-12.",
+                f"Set space in {TRACKER} to the key of your space, as in KAN-12.",
                 "Or ask a Jira admin to let your account browse it.",
             ],
         )
@@ -277,9 +277,15 @@ def detected_field(ctx: Context) -> Result:
 
 def tools_set_up(ctx: Context) -> Result:
     if missing := [tool for tool in ("bitbucket", "jira") if shutil.which(tool) is None]:
-        homes = {"bitbucket": _checkout(repo_tools), "jira": _checkout(jira_tools)}
-        # Setup links the tool's commands onto the PATH, and says so if they still won't run.
-        fix = [f"cd {homes[tool]} && devbox run setup" for tool in missing]
+        # dora has its own pinned copy of each tool's library, not a checkout to point at, so
+        # it says where to clone one. Setup links the tool's commands onto the PATH, and says
+        # so if they still won't run.
+        fix = []
+        for tool in missing:
+            name = TOOL_REPOSITORIES[tool]
+            home = f"~/projects/cli/{name}"
+            fix.append(f"git clone {GITHUB}/{name} {home} (unless it's there already)")
+            fix.append(f"cd {home} && devbox run setup")
         return missed(f"Not on the PATH: {', '.join(missing)}.", fix=fix)
     return met("bitbucket and jira are on the PATH.")
 
@@ -352,14 +358,14 @@ def history_kept(ctx: Context) -> Result:
     } - named
     integration = named | detected
     notes = [
-        f"{branch} gathers changes on their way to {production}: name it in [dora]"
-        " integration_branches."
+        f"{branch} gathers changes on their way to {production}: name it in integration_branches"
+        f" in {FILE}."
         for branch in sorted(detected)
     ]
     if not integration:
         return met(
             f"No branch gathers changes on their way to {production}.",
-            "If one does, name it in [dora] integration_branches.",
+            f"If one does, name it in integration_branches in {FILE}.",
         )
     gathered = [
         p
@@ -490,7 +496,7 @@ REQUIREMENTS: dict[str, list[Requirement]] = {
         Requirement("C1", "CI is on", pipelines_on),
         Requirement("C2", "A production deployment environment", production_environment),
         Requirement("C3", "Production is deployed by a CI step", deployment_step),
-        Requirement("R1", ".workspace.toml has a [dora] table", dora_table),
+        Requirement("R1", f"{FILE} is committed", dora_table),
         Requirement("R2", "The team's document exists", team_document),
         Requirement("T1", "A tracker space for the issues", jira_space),
         Requirement("T3", 'A link type that reads "is caused by" (optional)', causes_link_type),
@@ -553,11 +559,6 @@ def _has_cause(ctx: Context, issue: dict) -> bool:
         if web_link.get("object", {}).get("title", "").casefold().startswith("caused by"):
             return True
     return False
-
-
-def _checkout(package) -> Path:
-    """The checkout an editable package is installed from: its src folder's parent."""
-    return Path(package.__file__).resolve().parents[2]
 
 
 def _delete_token(service: str) -> str:

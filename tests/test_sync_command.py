@@ -16,7 +16,7 @@ def synced(monkeypatch, tmp_path):
 
     def sync_one(store, ref, now, since):
         if ref.name.endswith("broken"):
-            raise Precondition("No .workspace.toml on main.")
+            raise Precondition("No .config/ianf-dora.toml on main.")
         return results.get(ref.name, Synced())
 
     monkeypatch.setattr(command, "sync_one", sync_one)
@@ -56,5 +56,7 @@ def test_a_repository_that_fails_doesnt_stop_the_others(synced, capsys):
     with pytest.raises(Failure) as failed:
         command.run(["bitbucket.org/team/broken", "bitbucket.org/team/app"])
     assert failed.value.message == "1 of 2 didn't sync."
-    assert failed.value.details == ("bitbucket.org/team/broken: No .workspace.toml on main.",)
+    assert failed.value.details == (
+        "bitbucket.org/team/broken: No .config/ianf-dora.toml on main.",
+    )
     assert "bitbucket.org/team/app: 1 merged pull request" in capsys.readouterr().out

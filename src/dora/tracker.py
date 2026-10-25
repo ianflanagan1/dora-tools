@@ -37,12 +37,12 @@ class Failure:
 
 
 def settings(project: Project) -> jira_config.Config:
-    """The [tracker] settings in the project's committed .workspace.toml."""
-    if project.workspace is None:
-        raise Precondition(f"No .workspace.toml on {project.main_branch}.")
+    """The settings in the project's committed .config/ianf-tracker.toml."""
+    if project.tracker is None:
+        raise Precondition(f"No {jira_config.FILE} on {project.main_branch}.")
     with tempfile.TemporaryDirectory() as folder:
-        path = Path(folder) / ".workspace.toml"
-        path.write_text(project.workspace)
+        path = Path(folder) / "ianf-tracker.toml"
+        path.write_text(project.tracker)
         return jira_config.load(path)
 
 

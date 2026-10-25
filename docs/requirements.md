@@ -40,9 +40,9 @@ Where the repository lives and its CI deploys it. Each requirement is the same o
 | Id | Requirement | Why | Bitbucket Cloud | GitHub | Who provides it | Can dora-tools set it? |
 |---|---|---|---|---|---|---|
 | **C1** | CI is on for the repository | deployments are recorded by CI | Pipelines on: **Repository settings → Pipelines → Settings** | Actions enabled: **Settings → Actions** | a repository admin | Yes, with the repository admin's consent |
-| **C2** | A deployment environment for production, named as `[dora] production` says (**R1**) | it's where production deployments are recorded | **Repository settings → Pipelines → Deployments**; Bitbucket makes Test, Staging and Production when a repository first runs a deployment step | **Settings → Environments** | a repository admin | Yes, with the repository admin's consent |
+| **C2** | A deployment environment for production, named as `production` in `.config/ianf-dora.toml` says (**R1**) | it's where production deployments are recorded | **Repository settings → Pipelines → Deployments**; Bitbucket makes Test, Staging and Production when a repository first runs a deployment step | **Settings → Environments** | a repository admin | Yes, with the repository admin's consent |
 | **C3** | Production is deployed by a CI step that names the production environment, on the production branch (**R1**). Each successful run is one production deployment, finished when the step finishes. A manual trigger is fine. | deployments made any other way are invisible | a step in `bitbucket-pipelines.yml` with `deployment: <environment>` | a job with `environment: <environment>` | the developers, in the committed file | It can propose the change, as a commit for the team to review |
-| **C4** | A branch that gathers changes on their way to production, such as `develop`, reaches the production branch with its commits: by a merge commit, a rebase or a fast forward, not a squash. `dora check` finds such branches itself; naming them in `[dora] integration_branches` makes it certain. | a squash turns every change on the branch into one new commit, so their lead times start at that merge | the merge strategy chosen when merging | the same | everyone who merges | No: it's chosen at each merge |
+| **C4** | A branch that gathers changes on their way to production, such as `develop`, reaches the production branch with its commits: by a merge commit, a rebase or a fast forward, not a squash. `dora check` finds such branches itself; naming them in `integration_branches` in `.config/ianf-dora.toml` makes it certain. | a squash turns every change on the branch into one new commit, so their lead times start at that merge | the merge strategy chosen when merging | the same | everyone who merges | No: it's chosen at each merge |
 | C5 | *Recommended.* Only the production branch may deploy to production | stops another branch's deployment counting as production | the environment's settings, where your plan offers it | the environment's deployment branch rule | a repository admin | Yes, where the API offers it, with the repository admin's consent |
 
 Bitbucket stops listing a deployment once its pipeline's artifacts expire, 14 days after it runs. That's why the data is collected daily (**M4**) and why history begins at the first collection. GitHub keeps deployments.
@@ -53,8 +53,8 @@ Where the team's issues are, and so where production failures are recorded. Jira
 
 | Id | Requirement | Why | Jira Cloud | Who provides it | Can dora-tools set it? |
 |---|---|---|---|---|---|
-| **T1** | A space for the repository's issues, set in `[tracker]` (**R1**) | where production failures are recorded | a space (Jira's API calls it a project) | as jira-tools needs it | — |
-| **T2** | A way to mark an issue as a production failure: the failure label, `production-failure` unless `[dora] failure_label` names another | marks an issue as a production failure | a label, which needs no setup | nothing to set | — |
+| **T1** | A space for the repository's issues, set in `.config/ianf-tracker.toml` (**R1**) | where production failures are recorded | a space (Jira's API calls it a project) | as jira-tools needs it | — |
+| **T2** | A way to mark an issue as a production failure: the failure label, `production-failure` unless `failure_label` in `.config/ianf-dora.toml` names another | marks an issue as a production failure | a label, which needs no setup | nothing to set | — |
 | T3 | *Optional.* A way to link a failure to the issue whose work caused it | a cause can then be named by its issue; without it, it's recorded as a web link (**H5**) | an issue link type whose inward description reads `is caused by`, such as one named **Causes** (outward `causes`), under **Settings → System → Issue linking**; sites with Jira Service Management usually have one, named Problem/Incident | a tracker admin | Yes, with a site admin's consent, through Jira's API |
 | T4 | *Optional, for later.* A detection date on failure issues | lets a failure logged late give its real detection time | a **Detected** date field | a tracker admin | Yes, with a site admin's consent |
 
@@ -64,11 +64,13 @@ The collecting account needs only to read the space; it never changes an issue.
 
 | Id | Requirement | Why | Who provides it | Can dora-tools set it? |
 |---|---|---|---|---|
-| **R1** | A `.workspace.toml` committed at the root of the repository's main branch with a `[dora]` table, alongside jira-tools' `[tracker]`. It's read from the code host, not from anyone's clone. | what counts as production is the team's to decide, so it's shared, not personal | the developers, in a reviewed commit | It can propose the file, as a commit for the team to review |
+| **R1** | A `.config/ianf-dora.toml` committed on the repository's main branch, alongside jira-tools' `.config/ianf-tracker.toml`. It's read from the code host, not from anyone's clone. | what counts as production is the team's to decide, so it's shared, not personal | the developers, in a reviewed commit | It can propose the file, as a commit for the team to review |
 | **R2** | A document for the team saying how the metrics apply to their process and what each person does | the habits (**H**) only work if everyone knows them | the developers | It can propose one |
 
 ```toml
-[dora]
+#:schema https://raw.githubusercontent.com/ianflanagan1/dora-tools/main/schema/ianf-dora.v1.json
+# Needed: the version of this file's format, whose schema is in schema/.
+version = 1
 # Needed: the deployment environment whose deployments count as production, as the code host
 # names it, matched ignoring case.
 production = "production"
@@ -133,7 +135,7 @@ dora-tools changes nothing on its own initiative. These are the changes it can m
 |---|---|---|
 | Turn CI on (**C1**), create the production environment (**C2**), or restrict it to the production branch (**C5**) | the code host's repository settings | its repository admin |
 | Add a causes link type (**T3**), or a detection date (**T4**) | the tracker's site, for every space on it | a tracker admin |
-| Propose `.workspace.toml`'s `[dora]` table (**R1**), the pipeline step (**C3**) or the team's document (**R2**) | the repository | the developers, by reviewing the commit |
+| Propose `.config/ianf-dora.toml` (**R1**), the pipeline step (**C3**) or the team's document (**R2**) | the repository | the developers, by reviewing the commit |
 | Install the daily job (**M4**) | the collecting machine | its owner |
 
 It never creates or stores a token, deploys, changes an issue, or writes to the code host or tracker while collecting.

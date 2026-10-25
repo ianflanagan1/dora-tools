@@ -3,16 +3,16 @@ name = "dora-tools"
 version = "0.1.0"
 description = "The DORA metrics of a team's delivery, from its code host and Jira: checking a project has what they need."
 requires-python = ">=3.13"
-dependencies = ["cli-kit", "repo-tools", "jira-tools"]
+dependencies = ["cli-kit", "repo-settings", "repo-tools", "jira-tools"]
 
 [project.scripts]
 dora = "dora.__main__:main"
 
 [tool.uv.sources]
-cli-kit = { git = "https://github.com/ianflanagan1/cli-kit", branch = "main" }
-# The sibling checkouts, until repo-tools and jira-tools publish what dora needs.
-repo-tools = { path = "../repo-tools", editable = true }
-jira-tools = { path = "../jira-tools", editable = true }
+cli-kit = { git = "https://github.com/ianflanagan1/cli-kit", tag = "v0.1.0" }
+repo-settings = { git = "https://github.com/ianflanagan1/repo-settings", tag = "v0.1.0" }
+repo-tools = { git = "https://github.com/ianflanagan1/repo-tools", tag = "v0.1.0" }
+jira-tools = { git = "https://github.com/ianflanagan1/jira-tools", tag = "v0.1.0" }
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]

@@ -58,7 +58,7 @@ def test_a_missing_environment_says_where_to_add_it_or_which_to_name(ctx, bitbuc
     result = checks.production_environment(ctx)
     assert (result.status, result.details) == (Status.MISSED, ("It has: Test, Live.",))
     assert "Repository settings → Pipelines → Deployments" in result.fix[0]
-    assert "set [dora] production to one of: Test, Live" in result.fix[1]
+    assert "set production in .config/ianf-dora.toml to one of: Test, Live" in result.fix[1]
 
 
 def test_production_deploys_from_the_repos_main_branch_unless_set(ctx):
@@ -80,15 +80,17 @@ def test_a_production_branch_without_a_pipeline_is_missed(ctx, bitbucket_fake):
     bitbucket_fake.files.clear()
     result = checks.deployment_step(ctx)
     assert "No bitbucket-pipelines.yml on main" in result.summary
-    assert "set [dora] production_branch" in result.fix[1]
+    assert "set production_branch in .config/ianf-dora.toml" in result.fix[1]
 
 
 def test_a_project_without_dora_settings_misses_r1_and_leaves_what_needs_it_unchecked(ctx):
-    ctx.project = replace(ctx.project, settings=None, problem=("No .workspace.toml on main.",))
+    ctx.project = replace(
+        ctx.project, settings=None, problem=("No .config/ianf-dora.toml on main.",)
+    )
     result = checks.dora_table(ctx)
-    assert result.summary == "No .workspace.toml on main."
-    assert result.fix[0].startswith("Commit to main a .workspace.toml")
-    assert '[dora] production = "<your production deployment environment>"' in result.fix
+    assert result.summary == "No .config/ianf-dora.toml on main."
+    assert result.fix[0] == "Commit to main a .config/ianf-dora.toml with at least:"
+    assert 'version = 1, production = "<your production deployment environment>"' in result.fix
     requirement = checks.Requirement("C2", "", checks.production_environment)
     unchecked = checks.run(requirement, ctx)
     assert unchecked.status == Status.UNCHECKED
@@ -109,14 +111,15 @@ def test_the_team_document_is_read_from_the_main_branch_where_dora_doc_says(ctx,
     assert checks.team_document(ctx).summary == "No docs/dora-metrics.md on main."
 
 
-def test_the_tracker_settings_come_from_the_committed_workspace_file(ctx):
+def test_the_tracker_settings_come_from_the_committed_tracker_file(ctx):
     assert ctx.tracker.space == "KAN"
 
 
-def test_without_a_committed_workspace_file_tracker_checks_are_unchecked(ctx):
-    ctx.project = replace(ctx.project, workspace=None)
+def test_without_a_committed_tracker_file_tracker_checks_are_unchecked(ctx):
+    ctx.project = replace(ctx.project, tracker=None)
     result = checks.run(checks.Requirement("T1", "", checks.jira_space), ctx)
-    assert (result.status, result.summary) == (Status.UNCHECKED, "No .workspace.toml on main.")
+    summary = "No .config/ianf-tracker.toml on main."
+    assert (result.status, result.summary) == (Status.UNCHECKED, summary)
 
 
 def test_a_jira_space_the_token_cannot_see_is_missed(ctx, jira_fake):
@@ -139,11 +142,13 @@ def test_a_missing_detected_field_is_only_optional(ctx, jira_fake):
     assert status(checks.detected_field, ctx) == Status.OPTIONAL
 
 
-def test_a_missing_tool_says_to_run_setup_in_its_checkout_which_links_it(ctx, monkeypatch):
+def test_a_missing_tool_says_to_clone_its_repository_and_set_it_up(ctx, monkeypatch):
     monkeypatch.setattr(checks.shutil, "which", lambda tool: None if tool == "bitbucket" else "/x")
-    fix = checks.tools_set_up(ctx).fix
-    assert len(fix) == 1
-    assert fix[0].startswith("cd ") and fix[0].endswith("/repo-tools && devbox run setup")
+    assert list(checks.tools_set_up(ctx).fix) == [
+        "git clone https://github.com/ianflanagan1/repo-tools ~/projects/cli/repo-tools"
+        " (unless it's there already)",
+        "cd ~/projects/cli/repo-tools && devbox run setup",
+    ]
 
 
 def test_a_bitbucket_token_missing_a_scope_names_it_and_how_to_replace_it(ctx, bitbucket_fake):
@@ -215,7 +220,7 @@ def test_a_detected_integration_branch_kept_is_met_and_suggests_naming_it(ctx, b
     bitbucket_fake.merge(2, "develop", "main", parents=2, opened=at(3), merged=at(4))
     result = checks.history_kept(ctx)
     assert result.status == Status.MET
-    assert "name it in [dora] integration_branches" in result.details[0]
+    assert "name it in integration_branches in .config/ianf-dora.toml" in result.details[0]
 
 
 def test_a_feature_branch_squashed_into_production_is_fine(ctx, bitbucket_fake):
