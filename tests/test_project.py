@@ -36,7 +36,7 @@ def load(dora: str | None, tracker: str | None):
 
 @pytest.fixture
 def clone(tmp_path: Path) -> Path:
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
     subprocess.run(
         ["git", "-C", str(tmp_path), "remote", "add", "origin", "git@bitbucket.org:Team/App.git"],
         check=True,
