@@ -9,10 +9,10 @@ dependencies = ["cli-kit", "repo-settings", "repo-tools", "jira-tools"]
 dora = "dora.__main__:main"
 
 [tool.uv.sources]
-cli-kit = { git = "https://github.com/ianflanagan1/cli-kit", tag = "v0.1.0" }
-repo-settings = { git = "https://github.com/ianflanagan1/repo-settings", tag = "v0.1.0" }
-repo-tools = { git = "https://github.com/ianflanagan1/repo-tools", tag = "v0.1.0" }
-jira-tools = { git = "https://github.com/ianflanagan1/jira-tools", tag = "v0.1.0" }
+cli-kit = { git = "https://github.com/ianflanagan1/cli-kit", branch = "main" }
+repo-settings = { git = "https://github.com/ianflanagan1/repo-settings", branch = "main" }
+repo-tools = { git = "https://github.com/ianflanagan1/repo-tools", branch = "main" }
+jira-tools = { git = "https://github.com/ianflanagan1/jira-tools", branch = "main" }
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
