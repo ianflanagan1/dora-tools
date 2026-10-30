@@ -147,7 +147,7 @@ def test_a_missing_tool_says_to_clone_its_repository_and_set_it_up(ctx, monkeypa
     assert list(checks.tools_set_up(ctx).fix) == [
         "git clone https://github.com/ianflanagan1/repo-tools ~/projects/cli/repo-tools"
         " (unless it's there already)",
-        "cd ~/projects/cli/repo-tools && devbox run setup",
+        "cd ~/projects/cli/repo-tools && devbox run -- task setup",
     ]
 
 

@@ -75,7 +75,7 @@ Once per machine, with cli-kit, repo-tools and jira-tools checked out next to th
 
 ```sh
 cd ~/projects/cli/dora-tools
-devbox run setup
+devbox run -- task setup
 ```
 
 It builds `.venv` with repo-tools and jira-tools installed from those folders, and links `dora` into `~/.local/bin`, saying so if that folder isn't on your PATH. After pulling changes here or in them, run `devbox run -- uv sync`.
@@ -110,8 +110,8 @@ To check a new requirement, add it to docs/requirements.md first, then a functio
 ## Development
 
 ```sh
-devbox run test   # pytest
-devbox run lint   # ruff check and format
+devbox run -- task test   # pytest
+devbox run -- task lint   # ruff check and format
 ```
 
 Tests run the checks against a fake Bitbucket and Jira, in `tests/conftest.py`. Tests use `--import-mode=importlib`; share helpers through fixtures in `conftest.py`, not by importing it.

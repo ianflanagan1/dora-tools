@@ -1,0 +1,28 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Build .venv, create config.toml and link the commands onto your PATH
+    cmds:
+      - uv sync
+      - task: config
+      - .venv/bin/python -m cli_kit.link .
+
+  config:
+    internal: true
+    status:
+      - test -f config.toml
+    cmds:
+      - cp config.example.toml config.toml
+      - echo "✔ Created config.toml from config.example.toml. List the repositories to sync in it; git ignores it."
+
+  test:
+    desc: Run the tests
+    cmds:
+      - uv run pytest --quiet
+
+  lint:
+    desc: Lint, and check formatting
+    cmds:
+      - uv run ruff check
+      - uv run ruff format --check

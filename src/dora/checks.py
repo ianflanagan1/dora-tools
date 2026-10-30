@@ -285,7 +285,7 @@ def tools_set_up(ctx: Context) -> Result:
             name = TOOL_REPOSITORIES[tool]
             home = f"~/projects/cli/{name}"
             fix.append(f"git clone {GITHUB}/{name} {home} (unless it's there already)")
-            fix.append(f"cd {home} && devbox run setup")
+            fix.append(f"cd {home} && devbox run -- task setup")
         return missed(f"Not on the PATH: {', '.join(missing)}.", fix=fix)
     return met("bitbucket and jira are on the PATH.")
 
