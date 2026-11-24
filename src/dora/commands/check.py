@@ -1,7 +1,7 @@
 """dora check [repo] [--since <date>]
 
 Checks a repository against every requirement of the DORA metrics that can be checked, as
-dora-tools' docs/requirements.md lists them, and reports each. repo is host/workspace/name, such
+dora-tools' docs/requirements.md lists them, and reports each. repo is git-host/workspace/name, such
 as bitbucket.org/team/app, or a clone's folder; the clone the current folder is in unless given.
 Its settings are read from what's committed on its main branch, not from the clone:
 
@@ -21,7 +21,7 @@ from datetime import UTC, datetime, timedelta
 from cli_kit import cli
 from cli_kit.colour import BOLD, CYAN, GREEN, GREY, YELLOW, Style
 from cli_kit.outcome import NothingToDo, Precondition
-from repo_tools.forge_commands import parse_since
+from repo_tools.git_host_commands import parse_since
 
 from dora import checks, project
 from dora.checks import Context, Result, Status
@@ -42,7 +42,7 @@ def register(subparsers: cli.Subparsers) -> None:
         help="check a repository has what the DORA metrics need",
         description=__doc__.split("\n\n", 1)[1],
     )
-    parser.add_argument("repo", nargs="?", help="host/workspace/name, or a clone's folder")
+    parser.add_argument("repo", nargs="?", help="git-host/workspace/name, or a clone's folder")
     parser.add_argument(
         "--since",
         type=parse_since,
@@ -57,8 +57,8 @@ def check(
     since = since or datetime.now(UTC) - timedelta(days=DEFAULT_DAYS)
     if ctx is None:
         ref = project.resolve(given)
-        host = project.forge(ref)
-        ctx = Context(project.load(ref, host), since, host)
+        git_host = project.git_host(ref)
+        ctx = Context(project.load(ref, git_host), since, git_host)
     style = Style.for_stream(sys.stdout)
     print(style(BOLD, f"{ctx.project.ref}, habits since {since.date().isoformat()}"))
 

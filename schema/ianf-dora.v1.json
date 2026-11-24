@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/ianflanagan1/dora-tools/main/schema/ianf-dora.v1.json",
   "title": ".config/ianf-dora.toml, version 1",
-  "description": "What a repository counts as production, for dora-tools, which reads the copy committed on the code host's default branch. See R1 in dora-tools' docs/requirements.md.",
+  "description": "What a repository counts as production, for dora-tools, which reads the copy committed on the git host's default branch. See R1 in dora-tools' docs/requirements.md.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "production"],
@@ -12,7 +12,7 @@
       "const": 1
     },
     "production": {
-      "description": "The deployment environment whose deployments count as production, as the code host names it, matched ignoring case.",
+      "description": "The deployment environment whose deployments count as production, as the git host names it, matched ignoring case.",
       "type": "string",
       "minLength": 1
     },

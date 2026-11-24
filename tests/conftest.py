@@ -6,7 +6,7 @@ import pytest
 from cli_kit.outcome import Precondition
 from jira_tools.api import LinkType, User
 from repo_tools.bitbucket import api as bitbucket
-from repo_tools.bitbucket.forge import Bitbucket
+from repo_tools.bitbucket.git_host_api import Bitbucket
 
 from dora.checks import Context
 from dora.project import Project, Ref, Settings
@@ -179,5 +179,5 @@ def ctx(bitbucket_fake: FakeBitbucket, jira_fake: FakeJira) -> Context:
     project = Project(
         Ref("bitbucket.org", "team/app"), "main", Settings(production="production"), (), TRACKER
     )
-    host = Bitbucket(bitbucket_fake)
-    return Context(project, SINCE, host, bitbucket_client=bitbucket_fake, jira_client=jira_fake)
+    git_host = Bitbucket(bitbucket_fake)
+    return Context(project, SINCE, git_host, bitbucket_client=bitbucket_fake, jira_client=jira_fake)

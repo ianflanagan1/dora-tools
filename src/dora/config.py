@@ -19,7 +19,7 @@ CONFIG = Path(sys.prefix).parent / "config.toml"
 @dataclass(frozen=True)
 class Config:
     repos: tuple[str, ...] = ()
-    """The repositories dora sync syncs when given none, as host/workspace/name."""
+    """The repositories dora sync syncs when given none, as git-host/workspace/name."""
     database: Path | None = None
     """Where the data is kept; store.default_path() unless set."""
 
@@ -41,7 +41,7 @@ def load(path: Path | None = None) -> Config:
         raise Precondition(f"Unknown setting {', '.join(sorted(unknown))} in {path}.")
     repos = settings.get("repos", [])
     if not isinstance(repos, list) or not all(isinstance(r, str) and r for r in repos):
-        raise Precondition(f"repos in {path} must be a list of host/workspace/name.")
+        raise Precondition(f"repos in {path} must be a list of git-host/workspace/name.")
     database = settings.get("database")
     if database is not None and not (isinstance(database, str) and database):
         raise Precondition(f"database in {path} must be a path.")

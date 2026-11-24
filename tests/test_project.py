@@ -1,4 +1,4 @@
-"""Which repository is measured, and what it says about itself on its code host."""
+"""Which repository is measured, and what it says about itself on its git host."""
 
 import json
 import subprocess
@@ -13,8 +13,8 @@ from dora.project import Ref, Settings
 TRACKER = 'version = 1\nspace = "KAN"\n'
 
 
-class Host:
-    """A code host with one repository, team/app, whose main branch is trunk, committing the
+class FakeGitHostApi:
+    """A git host with one repository, team/app, whose main branch is trunk, committing the
     files given by path."""
 
     def __init__(self, files: dict[str, str]) -> None:
@@ -31,7 +31,7 @@ class Host:
 def load(dora: str | None, tracker: str | None):
     files = {".config/ianf-dora.toml": dora, ".config/ianf-tracker.toml": tracker}
     present = {path: text for path, text in files.items() if text is not None}
-    return project.load(Ref("bitbucket.org", "team/app"), Host(present))
+    return project.load(Ref("bitbucket.org", "team/app"), FakeGitHostApi(present))
 
 
 @pytest.fixture

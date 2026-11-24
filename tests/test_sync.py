@@ -1,9 +1,9 @@
-"""Syncing a repository into the store, from a fake code host and the tracker's failures."""
+"""Syncing a repository into the store, from a fake git host and the tracker's failures."""
 
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from repo_tools.forge import Commit, Deployment, Forge, PullRequest, Status
+from repo_tools.git_host_api import Commit, Deployment, GitHostApi, PullRequest, Status
 
 from dora.project import Project, Ref, Settings
 from dora.store import Store
@@ -18,8 +18,8 @@ def ago(days: float) -> datetime:
     return NOW - timedelta(days=days)
 
 
-class Host(Forge):
-    """A code host whose history is a line of commits, oldest first: c1, c2, c3, …"""
+class FakeGitHostApi(GitHostApi):
+    """A git host whose history is a line of commits, oldest first: c1, c2, c3, …"""
 
     name = "Fake"
 
@@ -38,6 +38,9 @@ class Host(Forge):
 
     def full_name(self, repo):
         return repo
+
+    def url(self, repo):
+        return f"git@fake.example:{repo}.git"
 
     def main_branch(self, repo):
         return "main"
@@ -74,8 +77,8 @@ def store(tmp_path) -> Store:
 
 
 @pytest.fixture
-def host() -> Host:
-    return Host()
+def git_host() -> FakeGitHostApi:
+    return FakeGitHostApi()
 
 
 def rows(store: Store, query: str, *args) -> list[tuple]:
@@ -87,35 +90,35 @@ def test_the_store_is_created_with_its_folder(tmp_path):
     assert (tmp_path / "a" / "b" / "dora.sqlite").is_file()
 
 
-def test_records_production_deployments(store, host):
-    host.deploy(1, "c2", 3)
-    synced = sync(store, PROJECT, host, [], NOW)
+def test_records_production_deployments(store, git_host):
+    git_host.deploy(1, "c2", 3)
+    synced = sync(store, PROJECT, git_host, [], NOW)
     assert synced.deployments == 1
     assert rows(store, "SELECT id, commit_sha, status FROM deployments") == [
         ("d1", "c2", "succeeded")
     ]
 
 
-def test_syncing_again_records_nothing_new(store, host):
-    host.deploy(1, "c2", 3)
-    sync(store, PROJECT, host, [], NOW)
-    synced = sync(store, PROJECT, host, [], NOW + timedelta(hours=1))
+def test_syncing_again_records_nothing_new(store, git_host):
+    git_host.deploy(1, "c2", 3)
+    sync(store, PROJECT, git_host, [], NOW)
+    synced = sync(store, PROJECT, git_host, [], NOW + timedelta(hours=1))
     assert (synced.deployments, synced.updated, synced.lines()) == (0, 0, [])
 
 
-def test_a_deployment_that_finished_since_is_updated(store, host):
-    host.deploy(1, "c2", 1, status=Status.IN_PROGRESS)
-    sync(store, PROJECT, host, [], NOW)
-    host.deployed.clear()
-    host.deploy(1, "c2", 1)
-    assert sync(store, PROJECT, host, [], NOW + timedelta(hours=1)).updated == 1
+def test_a_deployment_that_finished_since_is_updated(store, git_host):
+    git_host.deploy(1, "c2", 1, status=Status.IN_PROGRESS)
+    sync(store, PROJECT, git_host, [], NOW)
+    git_host.deployed.clear()
+    git_host.deploy(1, "c2", 1)
+    assert sync(store, PROJECT, git_host, [], NOW + timedelta(hours=1)).updated == 1
     assert rows(store, "SELECT status FROM deployments") == [("succeeded",)]
 
 
-def test_each_deployment_ships_the_commits_since_the_previous_one(store, host):
-    host.deploy(1, "c2", 5)
-    host.deploy(2, "c5", 3)
-    sync(store, PROJECT, host, [], NOW)
+def test_each_deployment_ships_the_commits_since_the_previous_one(store, git_host):
+    git_host.deploy(1, "c2", 5)
+    git_host.deploy(2, "c5", 3)
+    sync(store, PROJECT, git_host, [], NOW)
     assert rows(store, "SELECT sha FROM shipped WHERE deployment_id = 'd2' ORDER BY sha") == [
         ("c3",),
         ("c4",),
@@ -126,92 +129,92 @@ def test_each_deployment_ships_the_commits_since_the_previous_one(store, host):
     ]
 
 
-def test_the_first_deployment_on_record_ships_nothing_known(store, host):
-    host.deploy(1, "c2", 5)
-    sync(store, PROJECT, host, [], NOW)
+def test_the_first_deployment_on_record_ships_nothing_known(store, git_host):
+    git_host.deploy(1, "c2", 5)
+    sync(store, PROJECT, git_host, [], NOW)
     assert rows(store, "SELECT first, shipped_from FROM deployments") == [(1, None)]
     assert rows(store, "SELECT count(*) FROM shipped") == [(0,)]
 
 
-def test_deploying_an_older_commit_is_a_rollback(store, host):
-    host.deploy(1, "c3", 5)
-    host.deploy(2, "c5", 3)
-    host.deploy(3, "c3", 1)
-    sync(store, PROJECT, host, [], NOW)
+def test_deploying_an_older_commit_is_a_rollback(store, git_host):
+    git_host.deploy(1, "c3", 5)
+    git_host.deploy(2, "c5", 3)
+    git_host.deploy(3, "c3", 1)
+    sync(store, PROJECT, git_host, [], NOW)
     assert rows(store, "SELECT rollback FROM deployments WHERE id = 'd3'") == [(1,)]
     assert rows(store, "SELECT count(*) FROM shipped WHERE deployment_id = 'd3'") == [(0,)]
 
 
-def test_redeploying_the_same_commit_ships_nothing_and_is_no_rollback(store, host):
-    host.deploy(1, "c3", 5)
-    host.deploy(2, "c3", 3)
-    sync(store, PROJECT, host, [], NOW)
+def test_redeploying_the_same_commit_ships_nothing_and_is_no_rollback(store, git_host):
+    git_host.deploy(1, "c3", 5)
+    git_host.deploy(2, "c3", 3)
+    sync(store, PROJECT, git_host, [], NOW)
     assert rows(store, "SELECT shipped_from, rollback FROM deployments WHERE id = 'd2'") == [
         ("c3", 0)
     ]
 
 
-def test_failed_deployments_are_recorded_but_ship_nothing(store, host):
-    host.deploy(1, "c2", 5)
-    host.deploy(2, "c4", 3, status=Status.FAILED)
-    host.deploy(3, "c5", 1)
-    sync(store, PROJECT, host, [], NOW)
+def test_failed_deployments_are_recorded_but_ship_nothing(store, git_host):
+    git_host.deploy(1, "c2", 5)
+    git_host.deploy(2, "c4", 3, status=Status.FAILED)
+    git_host.deploy(3, "c5", 1)
+    sync(store, PROJECT, git_host, [], NOW)
     assert rows(store, "SELECT shipped_from FROM deployments WHERE id = 'd2'") == [(None,)]
     assert rows(store, "SELECT shipped_from FROM deployments WHERE id = 'd3'") == [("c2",)]
 
 
-def test_the_first_sync_reads_back_ninety_days(store, host):
-    sync(store, PROJECT, host, [], NOW)
-    assert host.asked_since == [ago(90)]
+def test_the_first_sync_reads_back_ninety_days(store, git_host):
+    sync(store, PROJECT, git_host, [], NOW)
+    assert git_host.asked_since == [ago(90)]
 
 
-def test_since_overrides_how_far_back_it_reads(store, host):
-    sync(store, PROJECT, host, [], NOW, since=ago(400))
-    assert host.asked_since == [ago(400)]
+def test_since_overrides_how_far_back_it_reads(store, git_host):
+    sync(store, PROJECT, git_host, [], NOW, since=ago(400))
+    assert git_host.asked_since == [ago(400)]
 
 
-def test_a_later_sync_reads_back_two_weeks_before_the_last(store, host):
-    sync(store, PROJECT, host, [], NOW)
-    sync(store, PROJECT, host, [], NOW + timedelta(days=1))
-    assert host.asked_since[1] == NOW - timedelta(days=14)
+def test_a_later_sync_reads_back_two_weeks_before_the_last(store, git_host):
+    sync(store, PROJECT, git_host, [], NOW)
+    sync(store, PROJECT, git_host, [], NOW + timedelta(days=1))
+    assert git_host.asked_since[1] == NOW - timedelta(days=14)
 
 
-def test_a_gap_longer_than_bitbucket_lists_deployments_is_warned_of(store, host):
-    sync(store, PROJECT, host, [], NOW)
-    synced = sync(store, PROJECT, host, [], NOW + timedelta(days=20))
+def test_a_gap_longer_than_bitbucket_lists_deployments_is_warned_of(store, git_host):
+    sync(store, PROJECT, git_host, [], NOW)
+    synced = sync(store, PROJECT, git_host, [], NOW + timedelta(days=20))
     assert synced.warnings == [
         "The last sync was 20 days ago: deployments from before 2026-10-07 may no longer be"
         " listed, and are lost."
     ]
 
 
-def test_records_merged_pull_requests_once(store, host):
-    host.pulls.append(
+def test_records_merged_pull_requests_once(store, git_host):
+    git_host.pulls.append(
         PullRequest(7, "KAN-20 Fix it", "me", "main", ago(3), ago(2), "c4", "https://x/7")
     )
-    assert sync(store, PROJECT, host, [], NOW).pulls == 1
-    assert sync(store, PROJECT, host, [], NOW + timedelta(hours=1)).pulls == 0
+    assert sync(store, PROJECT, git_host, [], NOW).pulls == 1
+    assert sync(store, PROJECT, git_host, [], NOW + timedelta(hours=1)).pulls == 0
     assert rows(store, "SELECT number, title, merge_commit FROM pull_requests") == [
         (7, "KAN-20 Fix it", "c4")
     ]
 
 
-def test_records_failures_with_their_causes_as_the_tracker_has_them_now(store, host):
+def test_records_failures_with_their_causes_as_the_tracker_has_them_now(store, git_host):
     failure = Failure(
         "KAN-20", "Checkout fails", ago(2), False, (Cause("link", "https://x/commits/c3"),)
     )
-    assert sync(store, PROJECT, host, [failure], NOW).failures == 1
+    assert sync(store, PROJECT, git_host, [failure], NOW).failures == 1
     fixed = Failure("KAN-20", "Checkout fails", ago(2), True, (Cause("issue", "KAN-7"),))
-    assert sync(store, PROJECT, host, [fixed], NOW + timedelta(hours=1)).failures == 0
+    assert sync(store, PROJECT, git_host, [fixed], NOW + timedelta(hours=1)).failures == 0
     assert rows(store, "SELECT key, done FROM failures") == [("KAN-20", 1)]
     assert rows(store, "SELECT kind, target FROM causes") == [("issue", "KAN-7")]
 
 
-def test_repositories_are_kept_apart_in_one_file(store, host):
-    host.deploy(1, "c2", 3)
+def test_repositories_are_kept_apart_in_one_file(store, git_host):
+    git_host.deploy(1, "c2", 3)
     other = Project(Ref("bitbucket.org", "team/other"), "main", Settings("production"))
-    sync(store, PROJECT, host, [], NOW)
-    sync(store, other, host, [], NOW)
+    sync(store, PROJECT, git_host, [], NOW)
+    sync(store, other, git_host, [], NOW)
     assert rows(
         store,
         "SELECT r.name, count(*) FROM deployments d JOIN repos r ON r.id = d.repo_id"
@@ -219,15 +222,15 @@ def test_repositories_are_kept_apart_in_one_file(store, host):
     ) == [("team/app", 1), ("team/other", 1)]
 
 
-def test_a_sync_that_fails_records_nothing_and_isnt_counted_as_the_last(store, host):
-    host.deploy(1, "c2", 3)
+def test_a_sync_that_fails_records_nothing_and_isnt_counted_as_the_last(store, git_host):
+    git_host.deploy(1, "c2", 3)
 
     def broken(repo, since, base=None):
-        raise RuntimeError("host went away")
+        raise RuntimeError("git host went away")
 
-    host.merged_pull_requests = broken
+    git_host.merged_pull_requests = broken
     with pytest.raises(RuntimeError):
-        sync(store, PROJECT, host, [], NOW)
+        sync(store, PROJECT, git_host, [], NOW)
     assert rows(store, "SELECT count(*) FROM deployments") == [(0,)]
-    assert rows(store, "SELECT error FROM syncs") == [("host went away",)]
+    assert rows(store, "SELECT error FROM syncs") == [("git host went away",)]
     assert store.last_synced(store.repo(PROJECT.ref)) is None

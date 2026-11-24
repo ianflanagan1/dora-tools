@@ -1,15 +1,15 @@
 """dora sync [repo]... [--since <date>]
 
 Reads each repository's production deployments, the commits each shipped, its merged pull
-requests and its production failures from its code host and tracker, into the SQLite file the
-metrics are calculated from. repo is host/workspace/name, such as bitbucket.org/team/app, or a
+requests and its production failures from its git host and tracker, into the SQLite file the
+metrics are calculated from. repo is git-host/workspace/name, such as bitbucket.org/team/app, or a
 clone's folder; with none, the repositories in dora-tools' config.toml.
 
 Each sync reads back two weeks before the last one, so it's safe to run again and catches up
 on what it missed; the first reads back 90 days, or to --since. Bitbucket lists deployments for
 only 14 days, so run it daily: it warns when the gap since the last sync was longer.
 
-It only reads from the code host and tracker, and writes only to the SQLite file:
+It only reads from the git host and tracker, and writes only to the SQLite file:
 ~/.local/share/dora/dora.sqlite unless config.toml says otherwise.
 """
 
@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 
 from cli_kit import cli, outcome
 from cli_kit.outcome import Done, Failure, NothingToDo, Precondition, Problem
-from repo_tools.forge_commands import parse_since
+from repo_tools.git_host_commands import parse_since
 
 from dora import config, project, tracker
 from dora.store import Store
@@ -31,7 +31,9 @@ def register(subparsers: cli.Subparsers) -> None:
         description=__doc__.split("\n\n", 1)[1],
     )
     parser.add_argument(
-        "repo", nargs="*", help="host/workspace/name, or a clone's folder; config.toml's if none"
+        "repo",
+        nargs="*",
+        help="git-host/workspace/name, or a clone's folder; config.toml's if none",
     )
     parser.add_argument("--since", type=parse_since, help="read back to this date or time")
     parser.set_defaults(run=lambda args: run(args.repo, args.since))
@@ -74,11 +76,11 @@ def run(given: list[str], since: datetime | None = None) -> Done | NothingToDo:
 
 def sync_one(store: Store, ref: project.Ref, now: datetime, since: datetime | None) -> Synced:
     """Syncs ref, returning what it recorded."""
-    host = project.forge(ref)
-    found = project.load(ref, host)
+    git_host = project.git_host(ref)
+    found = project.load(ref, git_host)
     if found.settings is None:
         raise Precondition(*found.problem, "Run `dora check` on it to see what it needs.")
     tracker_settings = tracker.settings(found)
     jira = tracker.connect(tracker_settings)
     failures = tracker.failures(jira, tracker_settings.space, found.settings.failure_label)
-    return sync(store, found, host, failures, now, since)
+    return sync(store, found, git_host, failures, now, since)

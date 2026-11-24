@@ -1,4 +1,4 @@
-"""A repository measured: which one, its code host, and what it says about itself in the
+"""A repository measured: which one, its git host, and what it says about itself in the
 .config/ianf-dora.toml committed on its main branch, as docs/requirements.md (R1) describes it.
 
     version = 1                              # needed: the version of the file's format
@@ -10,9 +10,9 @@
                                              # production; none unless set
     doc = "docs/dora-metrics.md"             # the team's document (R2)
 
-A repository is named by its host and name, bitbucket.org/workspace/name, or found from a clone's
-origin. Its settings are read from the host, not a clone, so they're what's committed, and no
-clone is needed.
+A repository is named by its git host's domain and its name, bitbucket.org/workspace/name, or
+found from a clone's origin. Its settings are read from the git host, not a clone, so they're
+what's committed, and no clone is needed.
 """
 
 import subprocess
@@ -23,17 +23,18 @@ from typing import assert_never
 
 import repo_settings
 from cli_kit.outcome import Precondition
+from jira_tools import config as jira_config
 from repo_settings import Missing, RemoteFiles, Source, Text, Unlocatable
 from repo_tools import clone
 from repo_tools.bitbucket import api as bitbucket
-from repo_tools.bitbucket.forge import Bitbucket
-from repo_tools.forge import Forge
+from repo_tools.bitbucket.git_host_api import Bitbucket
+from repo_tools.git_host_api import GitHostApi
 
-FILE = repo_settings.location("dora")
-TRACKER = repo_settings.location("tracker")
+FILE = ".config/ianf-dora.toml"
+TRACKER = jira_config.FILE
 TEXT = ("production", "failure_label", "production_branch", "doc")
 LISTS = ("integration_branches",)
-HOSTS = {"bitbucket.org": Bitbucket}
+GIT_HOSTS = {"bitbucket.org": Bitbucket}
 
 
 class Version(IntEnum):
@@ -44,14 +45,14 @@ class Version(IntEnum):
 
 @dataclass(frozen=True)
 class Ref:
-    """A repository on a code host."""
+    """A repository on a git host."""
 
-    host: str
+    domain: str
     name: str
     """workspace/name on Bitbucket; owner/name on GitHub."""
 
     def __str__(self) -> str:
-        return f"{self.host}/{self.name}"
+        return f"{self.domain}/{self.name}"
 
 
 @dataclass(frozen=True)
@@ -89,22 +90,22 @@ class Project:
 
 
 def parse(text: str) -> Ref:
-    """The repository text names, as host/name, such as bitbucket.org/team/app. Raises
-    Precondition for a host that isn't supported or a name that isn't one."""
-    host, _, name = text.strip().strip("/").partition("/")
-    if host not in HOSTS:
+    """The repository text names, as git-host/name, such as bitbucket.org/team/app. Raises
+    Precondition for a git host that isn't supported or a name that isn't one."""
+    domain, _, name = text.strip().strip("/").partition("/")
+    if domain not in GIT_HOSTS:
         raise Precondition(
-            f"{text} isn't a repository on a supported code host.",
-            f"Name it as {' or '.join(f'{h}/<workspace>/<name>' for h in HOSTS)}.",
+            f"{text} isn't a repository on a supported git host.",
+            f"Name it as {' or '.join(f'{h}/<workspace>/<name>' for h in GIT_HOSTS)}.",
         )
     if name.count("/") != 1 or not all(name.split("/")):
-        raise Precondition(f"{text} isn't host/workspace/name.")
-    return Ref(host, name.lower())
+        raise Precondition(f"{text} isn't git-host/workspace/name.")
+    return Ref(domain, name.lower())
 
 
 def from_clone(directory: Path) -> Ref:
     """The repository directory's clone is of, by its origin. Raises Precondition outside a git
-    repository, or for one without an origin on a supported host."""
+    repository, or for one without an origin on a supported git host."""
     result = subprocess.run(
         ["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
         capture_output=True,
@@ -125,57 +126,56 @@ def from_clone(directory: Path) -> Ref:
 
 
 def resolve(given: str | None) -> Ref:
-    """The repository a command is given: by name, as host/workspace/name, or as a clone's
+    """The repository a command is given: by name, as git-host/workspace/name, or as a clone's
     folder; the clone the current folder is in when it's given none."""
     if given is None or Path(given).is_dir():
         return from_clone(Path(given or "."))
     return parse(given)
 
 
-def forge(ref: Ref) -> Forge:
-    """The code host ref is on."""
-    return HOSTS[ref.host]()
+def git_host(ref: Ref) -> GitHostApi:
+    """The git host ref is on."""
+    return GIT_HOSTS[ref.domain]()
 
 
-def load(ref: Ref, host: Forge) -> Project:
+def load(ref: Ref, git_host: GitHostApi) -> Project:
     """The project ref names, with the settings committed on its main branch. A missing or wrong
     ianf-dora.toml is the project's problem, since that's one of the requirements."""
-    files = HostedFiles(ref, host)
+    files = HostedFiles(ref, git_host)
     main = files.default_branch()
-    settings, problem = read_settings(_committed(files, "dora"), main)
-    return Project(ref, main, settings, problem, _committed(files, "tracker"))
+    settings, problem = read_settings(_committed(files, FILE), main)
+    return Project(ref, main, settings, problem, _committed(files, TRACKER))
 
 
 class HostedFiles(RemoteFiles):
-    """The repository ref names, read from its code host. The host is asked for its main branch
+    """The repository ref names, read from its git host. The git host is asked for its main branch
     once."""
 
-    def __init__(self, ref: Ref, host: Forge) -> None:
+    def __init__(self, ref: Ref, git_host: GitHostApi) -> None:
         self.name = str(ref)
         self._ref = ref
-        self._host = host
+        self._git_host = git_host
         self._main: str | None = None
 
     def default_branch(self) -> str:
         if self._main is None:
-            self._main = self._host.main_branch(self._ref.name)
+            self._main = self._git_host.main_branch(self._ref.name)
         return self._main
 
     def file(self, revision: str, path: str) -> str | None:
-        return self._host.file(self._ref.name, revision, path)
+        return self._git_host.file(self._ref.name, revision, path)
 
 
-def _committed(files: HostedFiles, purpose: str) -> str | None:
-    """The text of the file for purpose committed on the main branch, or None when there's
-    none."""
-    found = repo_settings.fetch(Source.REMOTE_DEFAULT_BRANCH, files, purpose)
+def _committed(files: HostedFiles, file: str) -> str | None:
+    """The text of file committed on the main branch, or None when there's none."""
+    found = repo_settings.fetch(Source.REMOTE_DEFAULT_BRANCH, files, file)
     match found:
         case Text():
             return found.text
         case Missing():
             return None
         case Unlocatable():
-            raise AssertionError("A remote copy is always found, or its host raises.")
+            raise AssertionError("A remote copy is always found, or its git host raises.")
         case _:
             assert_never(found)
 

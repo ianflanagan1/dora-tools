@@ -2,7 +2,7 @@
 # and edit it. A setting left out takes the default shown here. What a repository counts as
 # production is its team's, in its own committed .config/ianf-dora.toml, not here.
 
-# The repositories `dora sync` syncs when given none, as host/workspace/name.
+# The repositories `dora sync` syncs when given none, as git-host/workspace/name.
 repos = ["bitbucket.org/your-workspace/your-repo"]
 
 # Where `dora sync` keeps what it reads. Back it up: Bitbucket lists deployments for only 14

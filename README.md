@@ -1,16 +1,16 @@
 # dora-tools
 
-The [DORA metrics](https://dora.dev/guides/dora-metrics/) of a team's delivery, read from its code host and Jira. Built on [cli-kit](../cli-kit), and on [repo-tools](../repo-tools) for Bitbucket and [jira-tools](../jira-tools) for Jira.
+The [DORA metrics](https://dora.dev/guides/dora-metrics/) of a team's delivery, read from its git host and Jira. Built on [cli-kit](../cli-kit), and on [repo-tools](../repo-tools) for Bitbucket and [jira-tools](../jira-tools) for Jira.
 
-What a project needs for the metrics, in its code host and tracker, in its repository, in its team's habits and on the collecting machine, and whose consent each change needs, is [docs/requirements.md](docs/requirements.md). It works with any branching model and merge strategy. Requirements are named there by id, such as **C2**, as they are here.
+What a project needs for the metrics, in its git host and tracker, in its repository, in its team's habits and on the collecting machine, and whose consent each change needs, is [docs/requirements.md](docs/requirements.md). It works with any branching model and merge strategy. Requirements are named there by id, such as **C2**, as they are here.
 
 ## Naming a repository
 
-Both commands take a repository as `host/workspace/name`, such as `bitbucket.org/ianflanagan1/reop1`, or as a clone's folder, which names the repository its `origin` is. A repository's settings, its `.config/ianf-tracker.toml` and `.config/ianf-dora.toml`, are read from what's committed on its main branch on the code host, never from a clone, so no clone is needed and a clone on another branch can't mislead them. Bitbucket is the only code host so far.
+Both commands take a repository as `git-host/workspace/name`, such as `bitbucket.org/ianflanagan1/reop1`, or as a clone's folder, which names the repository its `origin` is. A repository's settings, its `.config/ianf-tracker.toml` and `.config/ianf-dora.toml`, are read from what's committed on its main branch on the git git_host, never from a clone, so no clone is needed and a clone on another branch can't mislead them. Bitbucket is the only git host so far.
 
 ## `dora sync [<repo>]... [--since <date>]`
 
-Reads each repository's production deployments, the commits each shipped, its merged pull requests and its production failures, from the code host and tracker, into a SQLite file the metrics are calculated from. With no repository named, it syncs those listed in `config.toml` (see [Setup](#setup)).
+Reads each repository's production deployments, the commits each shipped, its merged pull requests and its production failures, from the git host and tracker, into a SQLite file the metrics are calculated from. With no repository named, it syncs those listed in `config.toml` (see [Setup](#setup)).
 
 ```
 $ dora sync
@@ -21,7 +21,7 @@ bitbucket.org/ianflanagan1/reop1: 1 new deployment, 1 merged pull request
 
 - **Safe to run again.** Each sync reads back two weeks before the last one that finished, so deployments still running last time, and anything missed, are caught up; what's already recorded is left as it is. The first sync reads back 90 days, or to `--since`.
 - **Run it daily.** Bitbucket lists a deployment for only 14 days, so a longer gap may lose some for good; the sync warns when the gap since the last one was longer.
-- **Reads only.** It never writes to the code host or tracker. It writes only to the SQLite file: `~/.local/share/dora/dora.sqlite` (under `$XDG_DATA_HOME` when that's set), or `database` in `config.toml`. Back the file up: its older deployments can't be read again.
+- **Reads only.** It never writes to the git host or tracker. It writes only to the SQLite file: `~/.local/share/dora/dora.sqlite` (under `$XDG_DATA_HOME` when that's set), or `database` in `config.toml`. Back the file up: its older deployments can't be read again.
 - **One file for every repository**, each row keyed by its repository, so a team's repositories can be combined in a query.
 - **What a deployment shipped** is worked out as the commits in its commit and not in the previous production deployment's. Deploying an older commit than production had is recorded as a rollback.
 - A repository that can't be synced, such as one with no `.config/ianf-dora.toml`, is reported, and the others are still synced; it ends ❌ naming it.
@@ -84,7 +84,7 @@ Setup also copies `config.example.toml` to `config.toml`, if there's none. It's 
 
 | Setting | Default | What for |
 |---|---|---|
-| `repos` | none | the repositories `dora sync` syncs when given none, as `host/workspace/name` |
+| `repos` | none | the repositories `dora sync` syncs when given none, as `git-host/workspace/name` |
 | `database` | `~/.local/share/dora/dora.sqlite` | where `dora sync` keeps what it reads |
 
 The Bitbucket and Jira tokens are repo-tools' and jira-tools': the first command that needs one says how to store it. To sync daily, add one line to your crontab with `crontab -e`, such as `0 9 * * * ~/.local/bin/dora sync >> ~/.local/share/dora/sync.log 2>&1`; a run missed while the machine was off is caught up by the next. dora can install that line for you, once you've agreed to it (**M4**).
@@ -97,7 +97,7 @@ src/dora/
 ├── project.py      the repository measured: named or from a clone, and its committed ianf-dora.toml
 ├── tracker.py      production failures and their causes, read from the tracker as plain records
 ├── store.py        the SQLite file: its tables, and recording what's read
-├── sync.py         syncing one repository into the store, through the code host's Forge
+├── sync.py         syncing one repository into the store, through the git host's GitHostApi
 ├── config.py       this machine's settings: which repositories to sync, and where the file is
 ├── checks.py       every requirement in docs/requirements.md, and the check of each that can be checked
 └── commands/
@@ -112,6 +112,7 @@ To check a new requirement, add it to docs/requirements.md first, then a functio
 ```sh
 devbox run -- task test   # pytest
 devbox run -- task lint   # ruff check and format
+devbox run -- task check  # lint, then test, failing on any problem
 ```
 
 Tests run the checks against a fake Bitbucket and Jira, in `tests/conftest.py`. Tests use `--import-mode=importlib`; share helpers through fixtures in `conftest.py`, not by importing it.

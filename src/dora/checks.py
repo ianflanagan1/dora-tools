@@ -1,5 +1,5 @@
 """Every requirement the DORA metrics have, as docs/requirements.md lists them, with a check for
-each one that can be checked. The code host's (C) are checked in Bitbucket and the tracker's (T)
+each one that can be checked. The git host's (C) are checked in Bitbucket and the tracker's (T)
 in Jira, the providers supported so far.
 
 Settings are checked as they are now. Habits are checked in what happened since a time: the pull
@@ -23,7 +23,7 @@ from jira_tools import config as jira_config
 from jira_tools import session as jira_session
 from jira_tools.api import Jira
 from repo_tools.bitbucket import api as bitbucket
-from repo_tools.forge import Forge
+from repo_tools.git_host_api import GitHostApi
 
 from dora import tracker
 from dora.project import FILE, TRACKER, Project, Settings
@@ -82,8 +82,8 @@ class Context:
 
     project: Project
     since: datetime
-    host: Forge
-    """The code host the project is on."""
+    git_host: GitHostApi
+    """The git host the project is on."""
     bitbucket_client: bitbucket.Bitbucket | None = None
     jira_client: Jira | None = None
 
@@ -226,7 +226,7 @@ def dora_table(ctx: Context) -> Result:
 
 def team_document(ctx: Context) -> Result:
     doc, branch = ctx.settings.doc, ctx.project.main_branch
-    if ctx.host.file(ctx.project.repo, branch, doc) is not None:
+    if ctx.git_host.file(ctx.project.repo, branch, doc) is not None:
         return met(f"{doc} is on {branch}.", "Whether the team has read it can't be checked.")
     return missed(
         f"No {doc} on {branch}.",
@@ -501,8 +501,8 @@ REQUIREMENTS: dict[str, list[Requirement]] = {
         Requirement("T1", "A tracker space for the issues", jira_space),
         Requirement("T3", 'A link type that reads "is caused by" (optional)', causes_link_type),
         Requirement("T4", "A Detected field (optional)", detected_field),
-        Requirement("M1", "The code host's and tracker's commands set up", tools_set_up),
-        Requirement("M2", "A code host token that can read the data", bitbucket_token),
+        Requirement("M1", "The git host's and tracker's commands set up", tools_set_up),
+        Requirement("M2", "A git host token that can read the data", bitbucket_token),
         Requirement("M3", "A tracker token that works", jira_token),
         Requirement("M4", "The daily collection job", daily_job),
     ],

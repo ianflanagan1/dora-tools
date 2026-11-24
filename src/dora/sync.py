@@ -15,7 +15,7 @@ out; nor is anything for a deployment that hasn't succeeded.
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from repo_tools.forge import Forge
+from repo_tools.git_host_api import GitHostApi
 
 from dora.project import Project
 from dora.store import Store
@@ -50,7 +50,7 @@ class Synced:
 def sync(
     store: Store,
     project: Project,
-    host: Forge,
+    git_host: GitHostApi,
     failures: list[Failure],
     now: datetime,
     since: datetime | None = None,
@@ -71,14 +71,14 @@ def sync(
 
     run = store.begin(repo, now)
     try:
-        for deployment in host.deployments(project.repo, settings.production, since):
+        for deployment in git_host.deployments(project.repo, settings.production, since):
             match store.record_deployment(repo, deployment):
                 case "new":
                     synced.deployments += 1
                 case "changed":
                     synced.updated += 1
-        _work_out_shipped(store, repo, project.repo, host)
-        for pull in host.merged_pull_requests(project.repo, since):
+        _work_out_shipped(store, repo, project.repo, git_host)
+        for pull in git_host.merged_pull_requests(project.repo, since):
             synced.pulls += store.record_pull(repo, pull)
         synced.failures = store.record_failures(repo, failures)
         store.commit()
@@ -90,7 +90,7 @@ def sync(
     return synced
 
 
-def _work_out_shipped(store: Store, repo: int, name: str, host: Forge) -> None:
+def _work_out_shipped(store: Store, repo: int, name: str, git_host: GitHostApi) -> None:
     """Works out what each succeeded production deployment shipped, oldest first, from the
     one before it."""
     for deployment, commit, finished_at in store.unworked(repo):
@@ -101,6 +101,6 @@ def _work_out_shipped(store: Store, repo: int, name: str, host: Forge) -> None:
         if previous == commit:
             store.record_shipped(repo, deployment, previous, [], rollback=False)
             continue
-        shipped = host.commits_between(name, previous, commit)
-        rollback = not shipped and bool(host.commits_between(name, commit, previous))
+        shipped = git_host.commits_between(name, previous, commit)
+        rollback = not shipped and bool(git_host.commits_between(name, commit, previous))
         store.record_shipped(repo, deployment, previous, shipped, rollback=rollback)

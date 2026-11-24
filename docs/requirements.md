@@ -1,12 +1,12 @@
 # What the DORA metrics need
 
-dora-tools measures a team's software delivery with the five [DORA](https://dora.dev/guides/dora-metrics/) metrics, from its code host and its tracker. This is everything a project has to have, and do, for the metrics to be calculated and correct: settings in its code host and tracker, files committed to its repository, the team's habits, and the setup on the machine that collects the data. Read it before adopting the metrics in a project.
+dora-tools measures a team's software delivery with the five [DORA](https://dora.dev/guides/dora-metrics/) metrics, from its git host and its tracker. This is everything a project has to have, and do, for the metrics to be calculated and correct: settings in its git host and tracker, files committed to its repository, the team's habits, and the setup on the machine that collects the data. Read it before adopting the metrics in a project.
 
 The metrics work with any branching model and any merge strategy: trunk-based or with a `develop` branch, merge commits, squashes, rebases or fast forwards, fixing forward or rolling back. [How your process affects the numbers](#how-your-process-affects-the-numbers) says what each choice means for them. The few things that would make a metric wrong are requirements below.
 
 Each requirement has an id, such as **C2**, so a project's own documentation can say which it meets, and `dora check` reports each by its id. For each one the tables say who provides it. Where dora-tools can make the change itself, it does so only with the consent of whoever owns what changes, never on its own initiative.
 
-Requirements are grouped by where they're met: the **code host** (C), the **tracker** (T), files committed to the **repository** (R), the team's **habits** (H) and the **machine** that collects the data (M). Bitbucket Cloud and Jira Cloud are supported now.
+Requirements are grouped by where they're met: the **git host** (C), the **tracker** (T), files committed to the **repository** (R), the team's **habits** (H) and the **machine** that collects the data (M). Bitbucket Cloud and Jira Cloud are supported now.
 
 ## The metrics
 
@@ -33,9 +33,9 @@ DORA groups them as throughput and instability. A **production deployment** is a
 - **Several repositories, or several services in one.** Today a repository is measured as one application. Combining repositories, or splitting one by service, isn't supported yet.
 - **Small numbers.** With a few deployments a month, report over a quarter rather than a week.
 
-## The code host
+## The git host
 
-Where the repository lives and its CI deploys it. Each requirement is the same on every code host; the columns say how each meets it. Bitbucket Cloud is supported now, GitHub next.
+Where the repository lives and its CI deploys it. Each requirement is the same on every git host; the columns say how each meets it. Bitbucket Cloud is supported now, GitHub next.
 
 | Id | Requirement | Why | Bitbucket Cloud | GitHub | Who provides it | Can dora-tools set it? |
 |---|---|---|---|---|---|---|
@@ -64,14 +64,14 @@ The collecting account needs only to read the space; it never changes an issue.
 
 | Id | Requirement | Why | Who provides it | Can dora-tools set it? |
 |---|---|---|---|---|
-| **R1** | A `.config/ianf-dora.toml` committed on the repository's main branch, alongside jira-tools' `.config/ianf-tracker.toml`. It's read from the code host, not from anyone's clone. | what counts as production is the team's to decide, so it's shared, not personal | the developers, in a reviewed commit | It can propose the file, as a commit for the team to review |
+| **R1** | A `.config/ianf-dora.toml` committed on the repository's main branch, alongside jira-tools' `.config/ianf-tracker.toml`. It's read from the git git_host, not from anyone's clone. | what counts as production is the team's to decide, so it's shared, not personal | the developers, in a reviewed commit | It can propose the file, as a commit for the team to review |
 | **R2** | A document for the team saying how the metrics apply to their process and what each person does | the habits (**H**) only work if everyone knows them | the developers | It can propose one |
 
 ```toml
 #:schema https://raw.githubusercontent.com/ianflanagan1/dora-tools/main/schema/ianf-dora.v1.json
 # Needed: the version of this file's format, whose schema is in schema/.
 version = 1
-# Needed: the deployment environment whose deployments count as production, as the code host
+# Needed: the deployment environment whose deployments count as production, as the git host
 # names it, matched ignoring case.
 production = "production"
 # The label that marks an issue as a production failure.
@@ -100,14 +100,14 @@ Nothing can enforce these, and nothing can detect every miss, so the team agrees
 
 | Id | Requirement | Who provides it | Can dora-tools set it? |
 |---|---|---|---|
-| **M1** | The commands for the code host and tracker set up: for Bitbucket and Jira, repo-tools and jira-tools, with `bitbucket` and `jira` on the PATH, as their READMEs say | the person collecting | — |
-| **M2** | A code host token, stored in the system credential store. For Bitbucket, an API token with only `read:repository:bitbucket`, `read:pullrequest:bitbucket` and `read:pipeline:bitbucket`; for GitHub, `gh`'s login. | the person collecting, from their Atlassian account | No: only its owner can create and store a token |
+| **M1** | The commands for the git host and tracker set up: for Bitbucket and Jira, repo-tools and jira-tools, with `bitbucket` and `jira` on the PATH, as their READMEs say | the person collecting | — |
+| **M2** | A git host token, stored in the system credential store. For Bitbucket, an API token with only `read:repository:bitbucket`, `read:pullrequest:bitbucket` and `read:pipeline:bitbucket`; for GitHub, `gh`'s login. | the person collecting, from their Atlassian account | No: only its owner can create and store a token |
 | **M3** | A tracker token: for Jira, an API token, stored as jira-tools' README says | the person collecting | No, as for M2 |
 | **M4** | The collection runs daily, as a scheduled job | the person collecting | Yes, with the machine owner's consent: see [The scheduled job](#the-scheduled-job) |
 
 ### What collecting does
 
-- **Reads**, never writes, from the code host and tracker: the production deployments, the commits each shipped, merged pull requests, and the issues with the failure label and their links.
+- **Reads**, never writes, from the git host and tracker: the production deployments, the commits each shipped, merged pull requests, and the issues with the failure label and their links.
 - **Writes** only to a SQLite file on the collecting machine, at a path stated when it's installed. It holds commit hashes, authored times and first lines of commit messages, pull request titles and authors' names, deployment ids and times, and failure issues' keys, creation times and links. It holds no code and no tokens.
 - **Is safe to run again**, and catches up on what it missed since its last run, as long as that's less than 14 days.
 
@@ -119,7 +119,7 @@ Up to about 10 days without a run loses nothing; 14 days or more, such as a holi
 
 ## Checking a project
 
-`dora check`, given the repository's name or run in a clone of it, checks every requirement that can be checked and reports each as met, missed with how to fix it, for a person to look at, or not checked and why. It reads the code host and tracker with the collecting machine's tokens and changes nothing; it ends ⚠️ when a requirement is missed.
+`dora check`, given the repository's name or run in a clone of it, checks every requirement that can be checked and reports each as met, missed with how to fix it, for a person to look at, or not checked and why. It reads the git host and tracker with the collecting machine's tokens and changes nothing; it ends ⚠️ when a requirement is missed.
 
 | Kind | Requirements | Limits |
 |---|---|---|
@@ -133,9 +133,9 @@ dora-tools changes nothing on its own initiative. These are the changes it can m
 
 | Change | Where | Consent of |
 |---|---|---|
-| Turn CI on (**C1**), create the production environment (**C2**), or restrict it to the production branch (**C5**) | the code host's repository settings | its repository admin |
+| Turn CI on (**C1**), create the production environment (**C2**), or restrict it to the production branch (**C5**) | the git host's repository settings | its repository admin |
 | Add a causes link type (**T3**), or a detection date (**T4**) | the tracker's site, for every space on it | a tracker admin |
 | Propose `.config/ianf-dora.toml` (**R1**), the pipeline step (**C3**) or the team's document (**R2**) | the repository | the developers, by reviewing the commit |
 | Install the daily job (**M4**) | the collecting machine | its owner |
 
-It never creates or stores a token, deploys, changes an issue, or writes to the code host or tracker while collecting.
+It never creates or stores a token, deploys, changes an issue, or writes to the git host or tracker while collecting.

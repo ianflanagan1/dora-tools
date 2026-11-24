@@ -1,7 +1,7 @@
 [project]
 name = "dora-tools"
 version = "0.1.0"
-description = "The DORA metrics of a team's delivery, from its code host and Jira: checking a project has what they need."
+description = "The DORA metrics of a team's delivery, from its git host and Jira: checking a project has what they need."
 requires-python = ">=3.13"
 dependencies = ["cli-kit", "repo-settings", "repo-tools", "jira-tools"]
 

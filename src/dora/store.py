@@ -4,7 +4,7 @@ Every repository's data is in the one file, each row keyed by its repository, so
 repositories can be combined later in a query. Times are ISO 8601 text, in UTC. Writing the same
 thing again changes nothing, so a sync can always be run again.
 
-    repos          the repositories synced, by host and name
+    repos          the repositories synced, by git host domain and name
     deployments    production deployments: their commit, status and times, and once worked out,
                    the previous production deployment's commit and whether this one rolled back
     shipped        the commits each production deployment shipped
@@ -21,7 +21,7 @@ from dataclasses import astuple
 from datetime import UTC, datetime
 from pathlib import Path
 
-from repo_tools.forge import Commit, Deployment, PullRequest, Status
+from repo_tools.git_host_api import Commit, Deployment, PullRequest, Status
 
 from dora.project import Ref
 from dora.tracker import Failure
@@ -113,10 +113,10 @@ class Store:
     def repo(self, ref: Ref) -> int:
         """The repository's id, adding it the first time."""
         self.db.execute(
-            "INSERT OR IGNORE INTO repos (host, name) VALUES (?, ?)", (ref.host, ref.name)
+            "INSERT OR IGNORE INTO repos (host, name) VALUES (?, ?)", (ref.domain, ref.name)
         )
         row = self.db.execute(
-            "SELECT id FROM repos WHERE host = ? AND name = ?", (ref.host, ref.name)
+            "SELECT id FROM repos WHERE host = ? AND name = ?", (ref.domain, ref.name)
         ).fetchone()
         return row[0]
 
