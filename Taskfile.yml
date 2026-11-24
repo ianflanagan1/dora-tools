@@ -26,3 +26,9 @@ tasks:
     cmds:
       - uv run ruff check
       - uv run ruff format --check
+
+  check:
+    desc: Lint, then test, failing on any problem
+    cmds:
+      - task: lint
+      - task: test
