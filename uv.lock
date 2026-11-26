@@ -128,7 +128,7 @@ dependencies = [
 [[package]]
 name = "repo-tools"
 version = "0.1.0"
-source = { git = "https://github.com/ianflanagan1/repo-tools?branch=main#b4e1a9ca1fd829e3a7f1ab7bf9357afe4710dcdb" }
+source = { git = "https://github.com/ianflanagan1/repo-tools?branch=main#de1f3e69e350eef5b540004fc3e7beb4398ff4bd" }
 dependencies = [
     { name = "cli-kit" },
     { name = "git-default-branch" },
