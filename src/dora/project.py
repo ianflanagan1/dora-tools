@@ -24,7 +24,7 @@ from typing import assert_never
 import repo_settings
 from cli_kit.outcome import Precondition
 from jira_tools import config as jira_config
-from repo_settings import Missing, RemoteFiles, Source, Text, Unlocatable
+from repo_settings import Invalid, Missing, RemoteFiles, Source, Text, Unlocatable
 from repo_tools import clone
 from repo_tools.bitbucket import api as bitbucket
 from repo_tools.bitbucket.git_host_api import Bitbucket
@@ -75,8 +75,9 @@ class Project:
     """None when ianf-dora.toml is missing or wrong; problem says why."""
     problem: tuple[str, ...] = ()
     """What's wrong with ianf-dora.toml, as a message and its details, when settings is None."""
-    tracker: str | None = None
-    """The text of the committed .config/ianf-tracker.toml, or None when there's none."""
+    tracker: str | Invalid | None = None
+    """The text of the committed .config/ianf-tracker.toml, None when there's none, or Invalid
+    when it's committed both there and at the root."""
 
     @property
     def repo(self) -> str:
@@ -143,7 +144,11 @@ def load(ref: Ref, git_host: GitHostApi) -> Project:
     ianf-dora.toml is the project's problem, since that's one of the requirements."""
     files = HostedFiles(ref, git_host)
     main = files.default_branch()
-    settings, problem = read_settings(_committed(files, FILE), main)
+    dora = _committed(files, FILE)
+    if isinstance(dora, Invalid):
+        settings, problem = None, (dora.message, *dora.details)
+    else:
+        settings, problem = read_settings(dora, main)
     return Project(ref, main, settings, problem, _committed(files, TRACKER))
 
 
@@ -166,14 +171,17 @@ class HostedFiles(RemoteFiles):
         return self._git_host.file(self._ref.name, revision, path)
 
 
-def _committed(files: HostedFiles, file: str) -> str | None:
-    """The text of file committed on the main branch, or None when there's none."""
+def _committed(files: HostedFiles, file: str) -> str | Invalid | None:
+    """The text of file committed on the main branch, None when there's none, or Invalid when
+    it's committed both in .config and at the root."""
     found = repo_settings.fetch(Source.REMOTE_DEFAULT_BRANCH, files, file)
     match found:
         case Text():
             return found.text
         case Missing():
             return None
+        case Invalid():
+            return found
         case Unlocatable():
             raise AssertionError("A remote copy is always found, or its git host raises.")
         case _:

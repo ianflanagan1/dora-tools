@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from cli_kit.outcome import Precondition
 
+from repo_settings import Invalid
+
 from dora import checks
 from dora.checks import Status
 from dora.project import Settings
@@ -120,6 +122,17 @@ def test_without_a_committed_tracker_file_tracker_checks_are_unchecked(ctx):
     result = checks.run(checks.Requirement("T1", "", checks.jira_space), ctx)
     summary = "No .config/ianf-tracker.toml on main."
     assert (result.status, result.summary) == (Status.UNCHECKED, summary)
+
+
+def test_a_tracker_file_committed_in_both_places_leaves_tracker_checks_unchecked(ctx):
+    both = Invalid(
+        "There are settings in both .config/ianf-tracker.toml on main at bitbucket.org/team/app"
+        " and ianf-tracker.toml on main at bitbucket.org/team/app: keep one of them.",
+        (),
+    )
+    ctx.project = replace(ctx.project, tracker=both)
+    result = checks.run(checks.Requirement("T1", "", checks.jira_space), ctx)
+    assert (result.status, result.summary) == (Status.UNCHECKED, both.message)
 
 
 def test_a_jira_space_the_token_cannot_see_is_missed(ctx, jira_fake):

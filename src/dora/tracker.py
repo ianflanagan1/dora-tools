@@ -13,6 +13,8 @@ from jira_tools import config as jira_config
 from jira_tools import session as jira_session
 from jira_tools.api import Jira
 
+from repo_settings import Invalid
+
 from dora.project import Project
 
 CAUSED_BY = "is caused by"
@@ -40,6 +42,8 @@ def settings(project: Project) -> jira_config.Config:
     """The settings in the project's committed .config/ianf-tracker.toml."""
     if project.tracker is None:
         raise Precondition(f"No {jira_config.FILE} on {project.main_branch}.")
+    if isinstance(project.tracker, Invalid):
+        raise Precondition(project.tracker.message, *project.tracker.details)
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "ianf-tracker.toml"
         path.write_text(project.tracker)

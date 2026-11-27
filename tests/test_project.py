@@ -123,6 +123,22 @@ def test_a_missing_or_wrong_dora_file_is_the_projects_problem(text, problem):
     assert problem in loaded.problem[0]
 
 
+def test_a_dora_file_committed_both_in_config_and_at_the_root_is_the_projects_problem():
+    files = {
+        ".config/ianf-dora.toml": 'version = 1\nproduction = "prod"\n',
+        "ianf-dora.toml": 'version = 1\nproduction = "prod"\n',
+    }
+    loaded = project.load(Ref("bitbucket.org", "team/app"), FakeGitHostApi(files))
+    assert loaded.settings is None
+    assert "There are settings in both .config/ianf-dora.toml" in loaded.problem[0]
+
+
+def test_a_dora_file_committed_at_the_root_is_read():
+    files = {"ianf-dora.toml": 'version = 1\nproduction = "prod"\n'}
+    loaded = project.load(Ref("bitbucket.org", "team/app"), FakeGitHostApi(files))
+    assert loaded.settings == Settings(production="prod")
+
+
 def test_the_committed_tracker_file_is_kept_for_the_tracker_checks():
     assert load('version = 1\nproduction = "prod"\n', TRACKER).tracker == TRACKER
     assert load('version = 1\nproduction = "prod"\n', None).tracker is None
